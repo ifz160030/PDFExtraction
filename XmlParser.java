@@ -25,6 +25,7 @@ public class XmlParser extends DefaultHandler {
     String date;
     String tmpValue;
     Font fontTmp;
+    boolean setDate;
     
     String outPath;
 
@@ -47,6 +48,7 @@ public class XmlParser extends DefaultHandler {
         date = "";
         tmpValue = "";
         xml = "";
+        setDate = false;
         this.outPath = outPath;
         parseDocument();
         cleanXml();
@@ -77,13 +79,23 @@ public class XmlParser extends DefaultHandler {
         for(int i = fontList.size(); i>0; i--){
             Font f = fontList.get(i-1);
             String temp = f.getText();
-            String day = temp.substring(0,temp.indexOf(" "));
-            if(f.getNumChars()<150 && weekDays.contains(day)){
+            int index = temp.indexOf(" ")>=0 ? temp.indexOf(" ") : temp.length();
+            String day = temp.substring(0,index);
+            if(f.getNumChars()<150 && weekDays.contains(day) && !setDate){
                 date = temp;
+                setDate = true;
                 fontList.remove(f);
             }
             else if(f.getNumChars()<150){
                 fontList.remove(f);
+            }
+            else if(f.startsLowerCase() && (i-2)>0){
+                Font prevFont = fontList.get(i-2);
+                if(prevFont.getNumChars()==1){
+                    f.addFront(prevFont.getText());
+                }
+                fontList.remove(prevFont);
+                i--;
             }
         }
         xml += "<date>"+date+"</date>\n";
@@ -130,6 +142,9 @@ public class XmlParser extends DefaultHandler {
             tmpValue = "";
         }
         if (tagName.equalsIgnoreCase("font")) {
+            if(!fontTmp.isIncomplete()){
+                fontTmp.trimEnd();
+            }
             fontList.add(fontTmp);
         }
     }
@@ -170,6 +185,14 @@ public class XmlParser extends DefaultHandler {
             numLines++;
             fullText += line;
         }
+        
+        public void addFront(String ch){
+            fullText = ch + fullText;
+        }
+        
+        public void trimEnd(){
+            fullText = fullText.substring(0, fullText.length()-1);
+        }
 
         public String getText(){
             return fullText;
@@ -185,6 +208,10 @@ public class XmlParser extends DefaultHandler {
 
         public boolean isIncomplete(){
             return endsIncomplete;
+        }
+        
+        public boolean startsLowerCase(){
+            return Character.isLowerCase(fullText.charAt(0));
         }
     }
 }
