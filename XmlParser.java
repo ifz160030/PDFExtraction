@@ -17,16 +17,21 @@ import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
+/**
+ * Extracts xml from XmlOrganizer and writes to an xml file with article and paragraph tags.
+ * 
+ * @author (Italo Zevallos) 
+ * @version (09/21/16)
+ */
 public class XmlParser extends DefaultHandler {
-    static List<String> weekDays = Arrays.asList("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo");
     File xmlFile;
     String xml;
-    ArrayList<Font> fontList;
-    String date;
+    ArrayList<Font> articleList;
     String tmpValue;
     Font fontTmp;
-    boolean setDate;
-    
+    boolean hasParagraph;
+    int prevX = -10000;
+
     String outPath;
 
     public static void main(String[] filePath) {
@@ -44,11 +49,11 @@ public class XmlParser extends DefaultHandler {
 
     public XmlParser(File file, String outPath) {
         this.xmlFile = file;
-        fontList = new ArrayList<Font>();
-        date = "";
+        articleList = new ArrayList<Font>();
+        fontTmp = new Font();
         tmpValue = "";
         xml = "";
-        setDate = false;
+        hasParagraph = false;
         this.outPath = outPath;
         parseDocument();
         cleanXml();
@@ -76,40 +81,15 @@ public class XmlParser extends DefaultHandler {
     private void cleanXml(){
         xml += "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n";
         xml += "<articles>\n";
-        for(int i = fontList.size(); i>0; i--){
-            Font f = fontList.get(i-1);
-            String temp = f.getText();
-            int index = temp.indexOf(" ")>=0 ? temp.indexOf(" ") : temp.length();
-            String day = temp.substring(0,index);
-            if(f.getNumChars()<150 && weekDays.contains(day) && !setDate){
-                date = temp;
-                setDate = true;
-                fontList.remove(f);
-            }
-            else if(f.getNumChars()<150){
-                fontList.remove(f);
-            }
-            else if(f.startsLowerCase() && (i-2)>0){
-                Font prevFont = fontList.get(i-2);
-                if(prevFont.getNumChars()==1){
-                    f.addFront(prevFont.getText());
-                }
-                fontList.remove(prevFont);
-                i--;
+        for(int i = articleList.size(); i>0; i--){
+            Font f = articleList.get(i-1);
+            if(f.getNumChars()<150){
+                articleList.remove(f);
             }
         }
-        xml += "<date>"+date+"</date>\n";
-        String tempString = "";
-        for(int i = 0; i<fontList.size(); i++){
-            Font f = fontList.get(i);
-            tempString += f.getText();
-            if(f.isIncomplete()){
-                //wait to append the rest of article
-            }
-            else if(!f.isIncomplete() || i == fontList.size()-1){
-                xml += "<article>"+tempString+"</article>\n";
-                tempString = "";
-            }
+        for(int i = 0; i<articleList.size(); i++){
+            Font f = articleList.get(i);
+            xml += "<article>\n"+f.getText()+"\n</article>\n";
         }
         xml += "</articles>";
     }
@@ -118,34 +98,50 @@ public class XmlParser extends DefaultHandler {
         try{
             String oldName = xmlFile.getName();
             String newName = oldName.substring(0, oldName.length()-4)+"clean.xml";
-            FileOutputStream fileOut = new FileOutputStream(new File(outPath+"/"+newName));
+            FileOutputStream fileOut = new FileOutputStream(new File(outPath+File.separator+newName));
             OutputStreamWriter  out = new OutputStreamWriter(fileOut,"UTF-8");
             out.write(xml,0,xml.length());
             out.close();
         }
         catch(Exception e){
+            e.printStackTrace();
         }
     }
 
     @Override
     public void startElement(String uri, String localName, String tagName, Attributes attributes) throws SAXException {
-        if (tagName.equalsIgnoreCase("font")) {
+        if(tagName.equalsIgnoreCase("text")){
+            int x = Integer.parseInt(attributes.getValue("x"));
+            if(prevX != -10000){
+                if(x<prevX && (prevX-15)<x && (prevX-x)>2 && !hasParagraph){
+                    //add [SP] to beginning
+                    fontTmp.addFront("<paragraph>");
+                    hasParagraph = true;
+                }
+                else if(x>prevX && (prevX+15)>x && (x-prevX)>2){
+                    //add [EP][SP] to end
+                    tmpValue+= "</paragraph>\n<paragraph>";
+                }
+            }
+            prevX = x;
+        }
+        if(tagName.equalsIgnoreCase("break")){
+            if(!hasParagraph){
+                fontTmp.addFront("<paragraph>");
+            }
+            fontTmp.addText("</paragraph>");
+            articleList.add(fontTmp);
             fontTmp = new Font();
+            prevX = -10000;
+            hasParagraph = false;
         }
     }
 
     @Override
     public void endElement(String uri, String localName, String tagName) throws SAXException {
-        // if end of font add to list
         if (tagName.equals("text")) {
             fontTmp.addText(tmpValue);
             tmpValue = "";
-        }
-        if (tagName.equalsIgnoreCase("font")) {
-            if(!fontTmp.isIncomplete()){
-                fontTmp.trimEnd();
-            }
-            fontList.add(fontTmp);
         }
     }
 
@@ -156,40 +152,31 @@ public class XmlParser extends DefaultHandler {
 
     public static class Font{
         String fullText;
-        int numLines;
-        boolean endsIncomplete;
 
         public Font(){
             fullText = "";
-            numLines = 0;
-            endsIncomplete = false;
         }
 
         public void addText(String line){
             if(line.equals("")){
                 return;
             }
-            //check incomplete
+            
             line = line.trim();
-            line = line.replace("<","&lt;");
-            line = line.replace(">","&lt;");
-            line = line.replace("&","&amp;");
+
             if(line.endsWith("-")){
-                endsIncomplete = true;
                 line = line.substring(0, line.length()-1);
             }
             else{
-                endsIncomplete = false;
                 line += " "; 
             }
-            numLines++;
             fullText += line;
         }
-        
+
         public void addFront(String ch){
             fullText = ch + fullText;
         }
-        
+
         public void trimEnd(){
             fullText = fullText.substring(0, fullText.length()-1);
         }
@@ -198,18 +185,10 @@ public class XmlParser extends DefaultHandler {
             return fullText;
         }
 
-        public int getNumLines(){
-            return numLines;
-        }
-        
         public int getNumChars(){
             return fullText.length();
         }
-
-        public boolean isIncomplete(){
-            return endsIncomplete;
-        }
-        
+        //shouldn't matter
         public boolean startsLowerCase(){
             return Character.isLowerCase(fullText.charAt(0));
         }
