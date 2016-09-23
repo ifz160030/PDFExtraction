@@ -1,26 +1,26 @@
 import java.io.*;
 
 /**
- * Write a description of class RunApplication here.
+ * Runs the application pdf2xml by passing in all PDF files from an input directory.
  * 
- * @author (your name) 
- * @version (a version number or a date)
+ * @author (Italo Zevallos) 
+ * @version (09/21/16)
  */
 public class RunApplication
 {
     public static void main(String[] filePath){
         String inPath = filePath[0];
-        String appPath = filePath[1];
-        String appName = filePath[2];
+        String appName = filePath[1];
+        String appPath = appName.substring(0,appName.lastIndexOf("/"));
         File inFolder = new File(inPath);
         File[] files = inFolder.listFiles();
         try{
             for(File file : files){
                 String fileName = file.getName();
                 if(fileName.endsWith(".PDF") || fileName.endsWith(".pdf")){
-                    ProcessBuilder pb = new ProcessBuilder(appPath+"/"+appName, inPath+"/"+fileName);
+                    ProcessBuilder pb = new ProcessBuilder(appName, inPath+"/"+fileName);
                     pb.directory(new File(appPath));
-                    pb.start();
+                    pb.start().waitFor();
                 }
             }
         }
