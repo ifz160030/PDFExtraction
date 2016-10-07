@@ -1,6 +1,7 @@
-About
+About:
 PDF extractor for news articles.
 
+Instructions:
 Download the PDFExtraction.jar included in the repository.
 Install pdf2xml. Download at launchpad.net/pdf2xml.
 Download the PDFBox java library ver 2.0.2. and put it in the same folder as the PDFExtraction.jar.
