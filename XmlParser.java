@@ -21,9 +21,12 @@ import org.xml.sax.helpers.DefaultHandler;
  * Extracts xml from XmlOrganizer and writes to an xml file with article and paragraph tags.
  * 
  * @author (Italo Zevallos) 
- * @version (09/21/16)
+ * @version (10/07/16)
  */
 public class XmlParser extends DefaultHandler {
+    final static int MIN_PARAGRAPH_DIST = 2;
+    final static int MAX_PARAGRAPH_DIST = 15;
+    final static int MIN_ARTICLE_LENGTH = 150;
     File xmlFile;
     String xml;
     ArrayList<Font> articleList;
@@ -83,7 +86,7 @@ public class XmlParser extends DefaultHandler {
         xml += "<articles>\n";
         for(int i = articleList.size(); i>0; i--){
             Font f = articleList.get(i-1);
-            if(f.getNumChars()<150){
+            if(f.getNumChars()<MIN_ARTICLE_LENGTH){
                 articleList.remove(f);
             }
         }
@@ -111,16 +114,21 @@ public class XmlParser extends DefaultHandler {
     @Override
     public void startElement(String uri, String localName, String tagName, Attributes attributes) throws SAXException {
         if(tagName.equalsIgnoreCase("text")){
+            //check end of paragraph incase no indentation
             int x = Integer.parseInt(attributes.getValue("x"));
             if(prevX != -10000){
-                if(x<prevX && (prevX-15)<x && (prevX-x)>2 && !hasParagraph){
+                if(x<prevX && (prevX-MAX_PARAGRAPH_DIST)<x && (prevX-x)>MIN_PARAGRAPH_DIST && !hasParagraph){
                     //add [SP] to beginning
                     fontTmp.addFront("<paragraph>");
                     hasParagraph = true;
                 }
-                else if(x>prevX && (prevX+15)>x && (x-prevX)>2){
+                else if(x>prevX && (prevX+MAX_PARAGRAPH_DIST)>x && (x-prevX)>MIN_PARAGRAPH_DIST){
                     //add [EP][SP] to end
                     tmpValue+= "</paragraph>\n<paragraph>";
+                    if(!hasParagraph){
+                        fontTmp.addFront("<paragraph>");
+                        hasParagraph = true;
+                    }
                 }
             }
             prevX = x;
