@@ -1,10 +1,10 @@
-import java.io.*;
+]import java.io.*;
 
 /**
  * Runs the application pdf2xml by passing in all PDF files from an input directory.
  * 
  * @author (Italo Zevallos) 
- * @version (09/21/16)
+ * @version (11/04/16)
  */
 public class RunApplication
 {
@@ -20,7 +20,18 @@ public class RunApplication
                 if(fileName.endsWith(".PDF") || fileName.endsWith(".pdf")){
                     ProcessBuilder pb = new ProcessBuilder(appName, inPath+"/"+fileName);
                     pb.directory(new File(appPath));
-                    pb.start().waitFor();
+                    pb.redirectErrorStream(true);
+                    Process p = pb.start();
+                    
+                    InputStreamReader is = new  InputStreamReader(p.getInputStream());
+                    BufferedReader br = new BufferedReader(is);
+                    String lineRead;
+                    while ((lineRead = br.readLine()) != null) {
+                        // destroy line
+                    }
+                    p.waitFor();
+                    is.close();
+                    br.close();
                 }
             }
         }
