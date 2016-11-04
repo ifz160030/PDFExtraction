@@ -21,7 +21,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * Extracts xml from XmlOrganizer and writes to an xml file with article and paragraph tags.
  * 
  * @author (Italo Zevallos) 
- * @version (10/07/16)
+ * @version (11/04/16)
  */
 public class XmlParser extends DefaultHandler {
     final static int MIN_PARAGRAPH_DIST = 2;
@@ -33,6 +33,7 @@ public class XmlParser extends DefaultHandler {
     String tmpValue;
     Font fontTmp;
     boolean hasParagraph;
+    boolean hasChange;
     int prevX = -10000;
 
     String outPath;
@@ -113,22 +114,44 @@ public class XmlParser extends DefaultHandler {
 
     @Override
     public void startElement(String uri, String localName, String tagName, Attributes attributes) throws SAXException {
+        //work on para end.
         if(tagName.equalsIgnoreCase("text")){
             //check end of paragraph incase no indentation
             int x = Integer.parseInt(attributes.getValue("x"));
             if(prevX != -10000){
-                if(x<prevX && (prevX-MAX_PARAGRAPH_DIST)<x && (prevX-x)>MIN_PARAGRAPH_DIST && !hasParagraph){
+                if(x<prevX && (prevX-MAX_PARAGRAPH_DIST)<=x && (prevX-x)>MIN_PARAGRAPH_DIST && (!hasParagraph || hasChange)){
+                    if(hasChange){
+                        tmpValue = "</paragraph>\n<paragraph>"+tmpValue.trim();
+                        fontTmp.addText(tmpValue);
+                        tmpValue = "";
+                    }
                     //add [SP] to beginning
-                    fontTmp.addFront("<paragraph>");
-                    hasParagraph = true;
+                    if(!hasParagraph){
+                        fontTmp.addFront("<paragraph>");
+                        hasParagraph = true;
+                    }
+                    hasChange = false;
                 }
-                else if(x>prevX && (prevX+MAX_PARAGRAPH_DIST)>x && (x-prevX)>MIN_PARAGRAPH_DIST){
+                else if(x>prevX && (prevX+MAX_PARAGRAPH_DIST)>=x && (x-prevX)>MIN_PARAGRAPH_DIST){
+                    if(hasChange){
+                        fontTmp.addText(tmpValue);
+                        tmpValue = "";
+                    }
                     //add [EP][SP] to end
                     tmpValue+= "</paragraph>\n<paragraph>";
                     if(!hasParagraph){
                         fontTmp.addFront("<paragraph>");
                         hasParagraph = true;
                     }
+                    hasChange = false;
+                }
+                else if(hasChange){
+                    fontTmp.addText(tmpValue);
+                    tmpValue = "";
+                    hasChange = (x-prevX)>60;
+                }
+                else if((x-prevX)>60){
+                    hasChange = true;
                 }
             }
             prevX = x;
@@ -137,19 +160,24 @@ public class XmlParser extends DefaultHandler {
             if(!hasParagraph){
                 fontTmp.addFront("<paragraph>");
             }
+            fontTmp.addText(tmpValue);
+            tmpValue = "";
             fontTmp.addText("</paragraph>");
             articleList.add(fontTmp);
             fontTmp = new Font();
             prevX = -10000;
             hasParagraph = false;
+            hasChange = false;
         }
     }
 
     @Override
     public void endElement(String uri, String localName, String tagName) throws SAXException {
         if (tagName.equals("text")) {
-            fontTmp.addText(tmpValue);
-            tmpValue = "";
+            if(!hasChange){
+                fontTmp.addText(tmpValue);
+                tmpValue = "";
+            }
         }
     }
 
@@ -169,7 +197,7 @@ public class XmlParser extends DefaultHandler {
             if(line.equals("")){
                 return;
             }
-            
+
             line = line.trim();
 
             if(line.endsWith("-")){
