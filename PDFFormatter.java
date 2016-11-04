@@ -97,11 +97,11 @@ public class PDFFormatter {
                     }
                     newTokens.add(token);
                 }
-                tokens.set(tcIndex, COSNumber.get("0"));
+                newTokens.set(tcIndex, COSNumber.get("0"));
 
                 PDStream newContents = new PDStream(toDoc);
-                OutputStream out = newContents.createOutputStream(COSName.FLATE_DECODE);
-                //OutputStream out = newContents.createOutputStream();
+                //OutputStream out = newContents.createOutputStream(COSName.FLATE_DECODE);
+                OutputStream out = newContents.createOutputStream();
                 ContentStreamWriter writer = new ContentStreamWriter(out);
                 writer.writeTokens(newTokens);
                 PDPage newPage = new PDPage(page.getMediaBox());
