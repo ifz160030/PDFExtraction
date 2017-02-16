@@ -7,6 +7,7 @@ import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSString;
 import org.apache.pdfbox.cos.COSNumber;
+import org.apache.pdfbox.cos.COSFloat;
 import org.apache.pdfbox.pdmodel.PDPageTree;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.contentstream.operator.Operator;
@@ -18,18 +19,18 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Removes graphics and merges text for easy text extraction.
+ * Removes graphics and formats text for easy text extraction.
  * 
  * @author (Italo Zevallos) 
- * @version (10/07/16)
+ * @version (11/28/16)
  */
-public class PDFFormatter {
+public class PDFFormatterNew {
     final static List<String> PAINTING_PATH_OPS = Arrays.asList("S", "s", "F", "f", "f*", "B", "b", "B*", "b*");
     //final static List<PDType1Font> DEFAULT_FONTS = Arrays.asList(PDType1Font.TIMES_ROMAN, PDType1Font.TIMES_BOLD,
     //        PDType1Font.TIMES_ITALIC, PDType1Font.TIMES_BOLD_ITALIC, PDType1Font.HELVETICA, PDType1Font.HELVETICA_BOLD,
     //        PDType1Font.HELVETICA_OBLIQUE, PDType1Font.HELVETICA_BOLD_OBLIQUE, PDType1Font.COURIER,PDType1Font.COURIER_BOLD,
     //        PDType1Font.COURIER_OBLIQUE, PDType1Font.COURIER_BOLD_OBLIQUE, PDType1Font.SYMBOL, PDType1Font.ZAPF_DINGBATS);
-    final static int TJ_SPACING_LIMIT = 100;
+    final static int TJ_SPACING_LIMIT = 120;
 
     public static void main(String[] filePath){
         String inPath = filePath[0];
@@ -83,11 +84,11 @@ public class PDFFormatter {
                         }
                         else if(op.getName().equals("Tc") || op.getName().equals("\"")){
                             if(tc.floatValue()!=0){
-                                newTokens.set(tcIndex, COSNumber.get("0"));
-                                tc = COSNumber.get("0");
+                                //newTokens.set(tcIndex, COSNumber.get("0"));
+                                //tc = COSNumber.get("0");
                             }
                             tc = (COSNumber)tokens.get(i-1);
-                            tcIndex = newTokens.size()-1;
+                            //tcIndex = newTokens.size()-1;
                         }
                         else if(op.getName().equals("TJ")){
                             //maybe check if tc and tw give space / scaling ops
@@ -97,7 +98,7 @@ public class PDFFormatter {
                     }
                     newTokens.add(token);
                 }
-                newTokens.set(tcIndex, COSNumber.get("0"));
+                //newTokens.set(tcIndex, COSNumber.get("0"));
 
                 PDStream newContents = new PDStream(toDoc);
                 //OutputStream out = newContents.createOutputStream(COSName.FLATE_DECODE);
@@ -151,48 +152,49 @@ public class PDFFormatter {
             if (element instanceof COSString){
                 COSString string = (COSString)element;
                 if(previous instanceof COSNumber){
-                    if(Math.abs(tempNum)>TJ_SPACING_LIMIT){
-                        merge += " "+formatString(string.getString(), tc);
+                    if(tc*1000-tempNum>TJ_SPACING_LIMIT){
+                        newArray.add(new COSFloat(-300));
+                        addString(string.getString(),newArray, tc);
                     }
                     else{
-                        merge += formatString(string.getString(), tc);
+                        newArray.add(new COSFloat(tempNum));
+                        addString(string.getString(), newArray, tc);
                     }
                     tempNum = 0;
                 }
                 else{
-                    merge += formatString(string.getString(), tc);
+                    addString(string.getString(), newArray, tc);
                 }
             }
             else if(element instanceof COSNumber){
                 COSNumber num = (COSNumber)element;
                 if(previous==null){
-                    element = null;
+                    //element = null;
                 }
                 else if(previous instanceof COSNumber){
-                    tempNum += num.floatValue()-(1000*tc);
+                    tempNum += num.floatValue();
                 }
                 else{
-                    tempNum = num.floatValue()-(1000*tc);
+                    tempNum = num.floatValue();
                 }
             }
             previous = element;
         }
-        COSString merged = new COSString(merge);
-        newArray.add(merged);
+        //COSString merged = new COSString(merge);
+        //newArray.add(merged);
         return newArray;
     }
 
-    public static String formatString(String s, float tc){
-        String merge = "";
-        if(Math.abs(1000*tc)>TJ_SPACING_LIMIT){
+    public static void addString(String s, COSArray a, float tc){
+        if(1000*tc>TJ_SPACING_LIMIT){
             for(int i = 0; i<s.length()-1; i++){
-                merge += s.charAt(i)+" ";
+                a.add(new COSString(s.charAt(i)+" "));
+                a.add(new COSFloat(tc*1000));
             }
-            merge += s.charAt(s.length()-1);
-            return merge;
+            a.add(new COSString(""+s.charAt(s.length()-1)));
         }
         else{
-            return s;
+            a.add(new COSString(s));
         }
     }
 }
